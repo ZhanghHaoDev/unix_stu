@@ -9,6 +9,12 @@ public:
     // 检查机器的字节序
     void check_endianness();
 
+    // 客户端使用套接字编程的过程
+    int client_socket();
+
+    // 服务端使用套接字编程的过程
+    int server_socket();
+
 };
 
 #endif // UNIX_NETWORK_STU_H
