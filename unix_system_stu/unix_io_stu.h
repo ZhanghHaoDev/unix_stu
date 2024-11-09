@@ -12,6 +12,9 @@ public:
     // 错误处理
     void demo_error_handling();
 
+    // 文件IO
+    int demo_file_io();
+
 };
 
 #endif // UNIX_IO_STD_H

@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "unix_io_stu.h"
 
@@ -138,4 +140,90 @@ void unix_io_stu::demo_error_handling() {
             printf("Error opening file: %s\n", strerror(errno));
         }
     }
+}
+
+int unix_io_stu::demo_file_io(){
+    // 创建一个新文件，文件所有者具有读写权限，文件所属组和其他用户具有读权限
+    int fd = creat("example.txt", S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
+    if (fd == -1) {
+        perror("creat");
+        return 1;
+    }
+    printf("File created with fd: %d\n", fd);
+
+    // 写入数据到文件
+    const char *text = "Hello, World!";
+    ssize_t bytes_written = write(fd, text, strlen(text));
+    if (bytes_written == -1) {
+        perror("write");
+        close(fd);
+        return 1;
+    }
+    printf("Written %zd bytes to file\n", bytes_written);
+
+    // 使用 lseek 设置文件偏移量到文件开头
+    if (lseek(fd, 0, SEEK_SET) == -1) {
+        perror("lseek");
+        close(fd);
+        return 1;
+    }
+
+    // 读取文件数据
+    char buffer[100];
+    ssize_t bytes_read = read(fd, buffer, sizeof(buffer) - 1);
+    if (bytes_read == -1) {
+        perror("read");
+        close(fd);
+        return 1;
+    }
+    buffer[bytes_read] = '\0'; // 确保缓冲区以空字符结尾
+    printf("Read %zd bytes from file: %s\n", bytes_read, buffer);
+
+    // 复制文件描述符
+    int fd_dup = dup(fd);
+    if (fd_dup == -1) {
+        perror("dup");
+        close(fd);
+        return 1;
+    }
+    printf("File descriptor duplicated with dup, fd_dup: %d\n", fd_dup);
+
+    // 复制文件描述符到指定的文件描述符
+    int fd_dup2 = dup2(fd, 10);
+    if (fd_dup2 == -1) {
+        perror("dup2");
+        close(fd);
+        close(fd_dup);
+        return 1;
+    }
+    printf("File descriptor duplicated with dup2, fd_dup2: %d\n", fd_dup2);
+
+    // 获取文件状态标志
+    int flags = fcntl(fd, F_GETFL);
+    if (flags == -1) {
+        perror("fcntl F_GETFL");
+        close(fd);
+        close(fd_dup);
+        close(fd_dup2);
+        return 1;
+    }
+    printf("File status flags: %d\n", flags);
+
+    // 设置文件状态标志为非阻塞
+    flags |= O_NONBLOCK;
+    if (fcntl(fd, F_SETFL, flags) == -1) {
+        perror("fcntl F_SETFL");
+        close(fd);
+        close(fd_dup);
+        close(fd_dup2);
+        return 1;
+    }
+    printf("File status flags set to non-blocking mode\n");
+
+    // 关闭文件描述符
+    close(fd);
+    close(fd_dup);
+    close(fd_dup2);
+
+    return 0;
 }

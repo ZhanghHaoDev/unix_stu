@@ -6,6 +6,8 @@ public:
     unix_system_stu();
     ~unix_system_stu();
 
+    void log_test();
+
 };
 
 #endif // UNIX_SYATEM_STU
