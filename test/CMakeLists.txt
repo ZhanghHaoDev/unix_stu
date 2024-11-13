@@ -1,34 +1,9 @@
-include_directories(
-    ${CMAKE_SOURCE_DIR}/unix_network_helloword
-    ${CMAKE_SOURCE_DIR}/unix_network_stu
-    ${CMAKE_SOURCE_DIR}/unix_system_stu
+include_directories(${CMAKE_SOURCE_DIR}/unix_stu)
+
+add_executable(unix_stu_test 
+    unix_stu_test.c
 )
 
-add_executable(unix_network_helloword_test 
-    unix_network_helloword_test.cpp
+target_link_libraries(unix_stu_test PUBLIC
+    unix_stu
 )
-
-target_link_libraries(unix_network_helloword_test PUBLIC
-    unix_network_helloword
-)
-
-################################################################################
-
-add_executable(unix_system_stu_test 
-    unix_system_stu_test.cpp
-)
-
-target_link_libraries(unix_system_stu_test PUBLIC
-    unix_system_stu
-)
-
-################################################################################
-
-add_executable(unix_network_stu_test 
-    unix_network_stu_test.cpp
-)
-
-target_link_libraries(unix_network_stu_test PUBLIC
-    unix_network_stu
-)
-
