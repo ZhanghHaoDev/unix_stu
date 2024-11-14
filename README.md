@@ -1,7 +1,6 @@
 # unix_stu
 
-UNIX 系统开发笔记的代码仓库，包括系统开发，网络开发，一些练写项目的仓库
-
-1. unix系统开发仓库：unix_system_stu
-2. unix网络开发仓库：unix_network_stu
-3. 
+1. UNIX系统开发知识库配套的代码仓库
+2. 后续添加一些其他项目的代码
+3. 开发环境为macos，llvm，cmake
+4. macos只支持POSIX，所以涉及到System V 的不写

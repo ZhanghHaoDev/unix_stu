@@ -7,8 +7,14 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <dirent.h>
+#include <pwd.h>
+#include <semaphore.h>
 
 #include <sys/stat.h>
+#include <sys/wait.h>
+#include <sys/times.h>
+#include <sys/mman.h>
+
 #include <arpa/inet.h>
 
 #define PORT 8080
@@ -439,4 +445,288 @@ void client() {
 
     // 关闭套接字
     close(sock);
+}
+
+int demo_processes1(){
+    // 1. exit 函数演示（由于 exit 会立即终止程序，这里不实际调用）
+
+    // 2. 获取进程 ID 和用户 ID
+    pid_t pid = getpid();
+    pid_t ppid = getppid();
+    uid_t uid = getuid();
+    uid_t euid = geteuid();
+    gid_t gid = getgid();
+    gid_t egid = getegid();
+
+    printf("当前进程 ID: %d\n", pid);
+    printf("父进程 ID: %d\n", ppid);
+    printf("用户 ID: %d\n", uid);
+    printf("有效用户 ID: %d\n", euid);
+    printf("组 ID: %d\n", gid);
+    printf("有效组 ID: %d\n", egid);
+
+    // 3. fork 函数演示
+    pid_t fork_pid = fork();
+    if (fork_pid < 0) {
+        perror("fork 失败");
+        exit(EXIT_FAILURE);
+    } else if (fork_pid == 0) {
+        // 子进程代码
+        printf("这是子进程，进程 ID: %d，父进程 ID: %d\n", getpid(), getppid());
+
+        // 5. exec 函数演示，使用 execlp 执行 ls 命令
+        execlp("ls", "ls", "-l", NULL);
+        // 如果 exec 调用成功，下面的代码将不会执行
+        perror("execlp 失败");
+        exit(EXIT_FAILURE);
+    } else {
+        // 父进程代码
+        printf("这是父进程，子进程 ID: %d\n", fork_pid);
+
+        // 4. wait 函数演示，等待子进程结束
+        int status;
+        pid_t wpid = wait(&status);
+        if (wpid == -1) {
+            perror("wait 出错");
+        } else {
+            printf("子进程 %d 结束，退出状态: %d\n", wpid, WEXITSTATUS(status));
+        }
+    }
+
+    // 7. 获取用户信息
+    struct passwd *pw = getpwuid(uid);
+    if (pw != NULL) {
+        printf("用户名: %s\n", pw->pw_name);
+        printf("用户主目录: %s\n", pw->pw_dir);
+    } else {
+        perror("无法获取用户信息");
+    }
+
+    char *login_name = getlogin();
+    if (login_name != NULL) {
+        printf("登录名: %s\n", login_name);
+    } else {
+        perror("无法获取登录名");
+    }
+
+    // 8. 获取进程时间
+    struct tms t;
+    clock_t clk = times(&t);
+    if (clk == (clock_t)-1) {
+        perror("times 调用失败");
+    } else {
+        printf("用户 CPU 时间: %ld\n", t.tms_utime);
+        printf("系统 CPU 时间: %ld\n", t.tms_stime);
+    }
+
+    // 6. 进程会计（由于需要管理员权限，且可能影响系统，这里不演示）
+
+    return 0;
+}
+
+int demo_processes2(){
+    pid_t pid, ppid, pgid, sid;
+
+    // 获取当前进程的进程 ID 和父进程 ID
+    pid = getpid();
+    ppid = getppid();
+    printf("当前进程 ID: %d\n", pid);
+    printf("父进程 ID: %d\n", ppid);
+
+    // 获取当前进程的进程组 ID
+    pgid = getpgrp();
+    printf("当前进程组 ID: %d\n", pgid);
+
+    // 获取当前进程的会话 ID
+    sid = getsid(pid);
+    printf("当前会话 ID: %d\n", sid);
+
+    // 创建子进程
+    pid_t fork_pid = fork();
+    if (fork_pid < 0) {
+        perror("fork 失败");
+        exit(EXIT_FAILURE);
+    } else if (fork_pid == 0) {
+        // 子进程代码
+        printf("\n--- 子进程 ---\n");
+        pid_t child_pid = getpid();
+        pid_t child_ppid = getppid();
+        pid_t child_pgid = getpgrp();
+        pid_t child_sid = getsid(child_pid);
+
+        printf("子进程 ID: %d\n", child_pid);
+        printf("子进程的父进程 ID: %d\n", child_ppid);
+        printf("子进程的进程组 ID: %d\n", child_pgid);
+        printf("子进程的会话 ID: %d\n", child_sid);
+
+        // 设置子进程的进程组 ID
+        if (setpgid(0, 0) == -1) {
+            perror("setpgid 失败");
+            exit(EXIT_FAILURE);
+        }
+        printf("子进程设置了新的进程组 ID\n");
+        child_pgid = getpgrp();
+        printf("子进程的新进程组 ID: %d\n", child_pgid);
+
+        // 创建新的会话
+        pid_t new_sid = setsid();
+        if (new_sid == -1) {
+            perror("setsid 失败");
+            exit(EXIT_FAILURE);
+        }
+        printf("子进程创建了新的会话，新的会话 ID: %d\n", new_sid);
+
+        // 再次获取子进程的会话 ID 和进程组 ID
+        child_pgid = getpgrp();
+        child_sid = getsid(0);
+        printf("子进程的新进程组 ID: %d\n", child_pgid);
+        printf("子进程的新会话 ID: %d\n", child_sid);
+
+        printf("--- 子进程结束 ---\n");
+        exit(EXIT_SUCCESS);
+    } else {
+        // 父进程代码
+        // 等待子进程结束
+        wait(NULL);
+        printf("\n子进程已结束。\n");
+    }
+
+    return 0;
+}
+
+int demo_processes3() {
+    pid_t pid;
+    int pipefd[2];
+    char buffer[128];
+    const char *shm_name = "/test_shm";
+    const char *sem_name = "/test_sem";
+
+    // 1. 无名管道
+    if (pipe(pipefd) == -1) {
+        perror("pipe 失败");
+        exit(EXIT_FAILURE);
+    }
+
+    pid = fork();
+    if (pid == -1) {
+        perror("fork 失败");
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // 子进程：读取管道
+        close(pipefd[1]); // 关闭写端
+        read(pipefd[0], buffer, sizeof(buffer));
+        printf("子进程从管道读取到数据：%s\n", buffer);
+        close(pipefd[0]); // 关闭读端
+        exit(EXIT_SUCCESS);
+    } else {
+        // 父进程：写入管道
+        close(pipefd[0]); // 关闭读端
+        char *msg = "Hello from parent via pipe!";
+        write(pipefd[1], msg, strlen(msg) + 1);
+        close(pipefd[1]); // 关闭写端
+        wait(NULL);
+    }
+
+    // 2. 命名管道（FIFO）
+    const char *fifo_name = "/tmp/myfifo";
+
+    // 创建命名管道
+    if (mkfifo(fifo_name, 0666) == -1) {
+        perror("mkfifo 失败");
+        // 如果命名管道已存在，继续
+    }
+
+    pid = fork();
+    if (pid == -1) {
+        perror("fork 失败");
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // 子进程：读取命名管道
+        int fd = open(fifo_name, O_RDONLY);
+        read(fd, buffer, sizeof(buffer));
+        printf("子进程从命名管道读取到数据：%s\n", buffer);
+        close(fd);
+        exit(EXIT_SUCCESS);
+    } else {
+        // 父进程：写入命名管道
+        int fd = open(fifo_name, O_WRONLY);
+        char *msg = "Hello from parent via FIFO!";
+        write(fd, msg, strlen(msg) + 1);
+        close(fd);
+        wait(NULL);
+        // 删除命名管道
+        unlink(fifo_name);
+    }
+
+    // 3. POSIX 共享内存
+    int shm_fd;
+    char *shm_addr;
+
+    shm_fd = shm_open(shm_name, O_CREAT | O_RDWR, 0666);
+    if (shm_fd == -1) {
+        perror("shm_open 失败");
+        exit(EXIT_FAILURE);
+    }
+
+    ftruncate(shm_fd, 128);
+
+    pid = fork();
+    if (pid == -1) {
+        perror("fork 失败");
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // 子进程：读取共享内存
+        shm_addr = mmap(NULL, 128, PROT_READ, MAP_SHARED, shm_fd, 0);
+        printf("子进程从共享内存读取到数据：%s\n", shm_addr);
+        munmap(shm_addr, 128);
+        close(shm_fd);
+        exit(EXIT_SUCCESS);
+    } else {
+        // 父进程：写入共享内存
+        shm_addr = mmap(NULL, 128, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+        char *msg = "Hello via POSIX shared memory!";
+        memcpy(shm_addr, msg, strlen(msg) + 1);
+        munmap(shm_addr, 128);
+        close(shm_fd);
+        wait(NULL);
+        // 删除共享内存
+        shm_unlink(shm_name);
+    }
+
+    // 4. POSIX 信号量
+    sem_t *sem;
+
+    sem = sem_open(sem_name, O_CREAT, 0666, 1);
+    if (sem == SEM_FAILED) {
+        perror("sem_open 失败");
+        exit(EXIT_FAILURE);
+    }
+
+    pid = fork();
+    if (pid == -1) {
+        perror("fork 失败");
+        exit(EXIT_FAILURE);
+    } else if (pid == 0) {
+        // 子进程：等待信号量
+        sem_wait(sem);
+        printf("子进程进入临界区\n");
+        sleep(2); // 模拟操作
+        printf("子进程离开临界区\n");
+        sem_post(sem);
+        sem_close(sem);
+        exit(EXIT_SUCCESS);
+    } else {
+        // 父进程：等待信号量
+        sem_wait(sem);
+        printf("父进程进入临界区\n");
+        sleep(2); // 模拟操作
+        printf("父进程离开临界区\n");
+        sem_post(sem);
+        sem_close(sem);
+        wait(NULL);
+        // 删除信号量
+        sem_unlink(sem_name);
+    }
+
+    return 0;
 }

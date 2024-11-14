@@ -17,4 +17,9 @@ void demo_file_system();
 void server();
 void client();
 
+// 关于进程
+int demo_processes1();
+int demo_processes2();
+int demo_processes3();
+
 #endif // UNIX_STU_H

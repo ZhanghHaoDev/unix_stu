@@ -20,6 +20,9 @@ int main(int argc, char *argv[]) {
     demo_error_handling();
     demo_file_io();
     demo_file_system();
+    demo_processes1();
+    demo_processes2();
+    demo_processes3();
 
     pthread_t server_tid, client_tid;
 
