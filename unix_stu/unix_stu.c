@@ -9,6 +9,8 @@
 #include <dirent.h>
 #include <pwd.h>
 #include <semaphore.h>
+#include <pthread.h>
+#include <signal.h>
 
 #include <sys/stat.h>
 #include <sys/wait.h>
@@ -18,6 +20,11 @@
 #include <arpa/inet.h>
 
 #define PORT 8080
+
+// 互斥锁和条件变量
+pthread_mutex_t mutex;
+pthread_cond_t cond;
+int ready = 0;
 
 void demo_standard_io() {
     // 1. 使用 printf 格式化输出到标准输出
@@ -727,6 +734,119 @@ int demo_processes3() {
         // 删除信号量
         sem_unlink(sem_name);
     }
+
+    return 0;
+}
+
+void *thread_func(void *arg) {
+    printf("线程 %ld 正在运行...\n", (long)arg);
+
+    // 等待条件变量
+    pthread_mutex_lock(&mutex);
+    while (!ready) {
+        pthread_cond_wait(&cond, &mutex);
+    }
+    pthread_mutex_unlock(&mutex);
+
+    printf("线程 %ld 收到信号，继续执行...\n", (long)arg);
+    pthread_exit((void *)0);
+}
+
+int demo_threads() {
+    pthread_t thread1, thread2;
+    void *retval;
+
+    // 初始化互斥锁和条件变量
+    pthread_mutex_init(&mutex, NULL);
+    pthread_cond_init(&cond, NULL);
+
+    // 创建线程
+    pthread_create(&thread1, NULL, thread_func, (void *)1);
+    pthread_create(&thread2, NULL, thread_func, (void *)2);
+
+    // 等待一段时间
+    sleep(2);
+
+    // 发送信号到条件变量
+    pthread_mutex_lock(&mutex);
+    ready = 1;
+    pthread_cond_broadcast(&cond);
+    pthread_mutex_unlock(&mutex);
+
+    // 等待线程结束
+    pthread_join(thread1, &retval);
+    pthread_join(thread2, &retval);
+
+    // 创建一个分离线程
+    pthread_t detached_thread;
+    pthread_create(&detached_thread, NULL, thread_func, (void *)3);
+    pthread_detach(detached_thread);
+
+    // 等待一段时间
+    sleep(2);
+
+    // 取消分离线程
+    pthread_cancel(detached_thread);
+
+    // 销毁互斥锁和条件变量
+    pthread_mutex_destroy(&mutex);
+    pthread_cond_destroy(&cond);
+
+    printf("主线程结束。\n");
+    return 0;
+}
+
+void signal_handler(int sig) {
+    printf("收到信号 %d\n", sig);
+}
+
+int demo_signals(){
+    sigset_t set, oldset;
+    struct sigaction sa;
+    int sig;
+
+    // 1. 使用 signal 设置信号处理函数
+    signal(SIGINT, signal_handler);
+
+    // 2. 使用 sigaction 设置信号处理函数
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+    sigaction(SIGTERM, &sa, NULL);
+
+    // 3. 向当前进程发送信号
+    raise(SIGINT);
+
+    // 4. 向指定进程发送信号
+    kill(getpid(), SIGTERM);
+
+    // 5. 初始化信号集为空
+    sigemptyset(&set);
+
+    // 6. 将 SIGINT 添加到信号集中
+    sigaddset(&set, SIGINT);
+
+    // 7. 检查 SIGINT 是否在信号集中
+    if (sigismember(&set, SIGINT)) {
+        printf("SIGINT 在信号集中\n");
+    }
+
+    // 8. 屏蔽 SIGINT 信号
+    sigprocmask(SIG_BLOCK, &set, &oldset);
+
+    // 9. 获取未决信号集
+    sigpending(&set);
+    if (sigismember(&set, SIGINT)) {
+        printf("SIGINT 是未决信号\n");
+    }
+
+    // 10. 挂起进程直到收到信号
+    printf("挂起进程，等待信号...\n");
+    sigsuspend(&oldset);
+
+    // 11. 等待信号
+    sigwait(&set, &sig);
+    printf("收到信号 %d\n", sig);
 
     return 0;
 }

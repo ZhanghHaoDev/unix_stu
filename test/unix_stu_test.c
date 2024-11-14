@@ -23,6 +23,8 @@ int main(int argc, char *argv[]) {
     demo_processes1();
     demo_processes2();
     demo_processes3();
+    demo_threads();
+    demo_signals();
 
     pthread_t server_tid, client_tid;
 

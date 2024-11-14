@@ -22,4 +22,10 @@ int demo_processes1();
 int demo_processes2();
 int demo_processes3();
 
+// 关于线程
+int demo_threads();
+
+// 关于信号
+int demo_signals();
+
 #endif // UNIX_STU_H
